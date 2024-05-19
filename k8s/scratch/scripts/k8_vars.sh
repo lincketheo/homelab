@@ -16,11 +16,11 @@ function validate_app_arg() {
 
 function get_pod_name() {
 	validate_app_arg $1
-	echo $(kubectl get pods -n todo-app -l app=$1 -o jsonpath="{.items[0].metadata.name}")
+	echo $(kubectl get pods -n $namespace -l app=$1 -o jsonpath="{.items[0].metadata.name}")
 }
 
 function get_deployment_name() {
 	validate_app_arg $1
-	echo $(kubectl get deployments -n todo-app -l app=$1 -o jsonpath="{.items[0].metadata.name}")
+	echo $(kubectl get deployments -n $namespace -l app=$1 -o jsonpath="{.items[0].metadata.name}")
 }
 

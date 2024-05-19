@@ -1,7 +1,9 @@
 #!/bin/bash
 
+namespace=homelab
+
 # Create namespaces if they don't exist
-kubectl get namespace todo-app &> /dev/null || kubectl create namespace todo-app
+kubectl get namespace $namespace &> /dev/null || kubectl create namespace $namespace
 kubectl get namespace ingress-nginx &> /dev/null && kubectl delete all --all -n ingress-nginx
 
 # Start nginx-controller https://kubernetes.github.io/ingress-nginx/deploy/
