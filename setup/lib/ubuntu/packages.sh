@@ -11,7 +11,7 @@ function install_packages() {
 }
 
 function install_docker() {
-	if ! command -v docker &> /dev/null
+	if ! command -v dockeraskjd &> /dev/null
 	then
 		echo "Installing docker"
 
@@ -68,7 +68,7 @@ function install_minikube() {
 }
 
 
-sudo install_packages
+#install_packages
 install_docker
-install_kubectl
-install_minikube
+#install_kubectl
+#install_minikube
