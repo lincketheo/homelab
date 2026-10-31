@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pihole
+  labels:
+    app: pihole
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: pihole
+  template:
+    metadata:
+      labels:
+        app: pihole
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        checksum/adlists: {{ include (print $.Template.BasePath "/adlists.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: pihole
+          image: pihole/pihole:latest
+          env:
+            - name: TZ
+              value: America/New_York
+
+            # Answer regardless of origin - k8s is in its own network
+            # so packets seem like they come from a different subnet
+            - name: FTLCONF_dns_listeningMode
+              value: "all"
+
+            # Outside dns servers. This is important for the WAN pihole
+            # mode so that the pihole doesn't use the router provided
+            # DNS (which is itself)
+            - name: FTLCONF_dns_upstreams
+              value: "1.1.1.1;1.0.0.1"
+
+            # Password from k8s secret
+            - name: FTLCONF_webserver_api_password
+              valueFrom:
+                secretKeyRef:
+                  name: pihole-admin
+                  key: password
+
+          ports:
+
+            # DNS Ports
+            - name: dns-udp
+              containerPort: 53
+              protocol: UDP
+            - name: dns-tcp
+              containerPort: 53
+              protocol: TCP
+
+            # Http ports
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          # Imports the blocklists in templates/adlists.yaml. Backgrounded so
+          # kubelet isn't held up, and so a gravity rebuild can take minutes
+          # without stalling the container start.
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - nohup sh /etc/pihole-adlists/import.sh >/tmp/adlist-import.log 2>&1 &
+
+          livenessProbe:
+            tcpSocket:
+              port: dns-tcp
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /admin/
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /etc/pihole
+            - name: adlists
+              mountPath: /etc/pihole-adlists
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: pihole
+        - name: adlists
+          configMap:
+            name: pihole-adlists

@@ -1,0 +1,14 @@
+Pi-hole is starting. First boot downloads blocklists, so give it a few minutes:
+
+  kubectl -n {{ .Release.Namespace }} rollout status deploy/pihole
+
+Web UI:
+  http://<your-pi>:8080/admin
+
+Admin password:
+  kubectl -n {{ .Release.Namespace }} get secret pihole-admin \
+    -o jsonpath='{.data.password}' | base64 -d; echo
+
+Test DNS:
+  dig @<pi-ip> example.com        # should resolve
+  dig @<pi-ip> doubleclick.net    # should return 0.0.0.0 (blocked)

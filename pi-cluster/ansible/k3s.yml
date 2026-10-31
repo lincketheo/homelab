@@ -1,0 +1,47 @@
+- name: Prep all nodes
+  hosts: k3s
+  become: true
+  tasks:
+    - name: Upgrade packages
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: dist
+
+    - name: Enable memory cgroup (required by k3s on Pi OS)
+      ansible.builtin.lineinfile:
+        path: /boot/firmware/cmdline.txt
+        regexp: '^((?!.*cgroup_memory=1).*)$'
+        line: '\1 cgroup_memory=1 cgroup_enable=memory'
+        backrefs: true
+      register: cmdline
+
+    - name: Reboot if cmdline changed
+      ansible.builtin.reboot:
+      when: cmdline.changed
+
+- name: k3s server
+  hosts: k3s_server
+  become: true
+  tasks:
+    - name: Install k3s server
+      ansible.builtin.shell: >
+        curl -sfL https://get.k3s.io |
+        INSTALL_K3S_EXEC="server --disable traefik --write-kubeconfig-mode 644"
+        K3S_TOKEN="{{ k3s_token }}" sh -
+      args:
+        creates: /etc/systemd/system/k3s.service
+      no_log: true
+
+- name: k3s agent
+  hosts: k3s_agent
+  become: true
+  tasks:
+    - name: Install k3s agent
+      ansible.builtin.shell: >
+        curl -sfL https://get.k3s.io |
+        INSTALL_K3S_EXEC="agent --node-label role=dns"
+        K3S_URL="https://{{ hostvars[groups['k3s_server'][0]].ansible_host }}:6443"
+        K3S_TOKEN="{{ k3s_token }}" sh -
+      args:
+        creates: /etc/systemd/system/k3s-agent.service
+      no_log: true

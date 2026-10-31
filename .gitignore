@@ -1,0 +1,5 @@
+.vault_pass
+*.retry
+kubeconfig
+nk4s.yaml
+tags

@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pihole-adlists
+  labels:
+    app: pihole
+data:
+
+  # Runs in the background from the container's postStart hook.
+  # To add a blocklist, copy an adlist line. To block a domain, copy a regex
+  # line. Nothing else needs touching.
+  import.sh: |
+    #!/bin/sh
+    set -euf
+
+    DB=/etc/pihole/gravity.db
+
+    # On a fresh volume FTL creates gravity.db during startup - wait for it
+    while [ ! -f "$DB" ]; do sleep 5; done
+    sleep 10
+
+    new_lists=0
+
+    # adlist <url> <comment>   - the comment shows in the Pi-hole UI
+    adlist() {
+      if [ "$(pihole-FTL sqlite3 "$DB" "SELECT COUNT(*) FROM adlist WHERE address = '$1';")" = "0" ]; then
+        pihole-FTL sqlite3 "$DB" "INSERT INTO adlist (address, enabled, comment) VALUES ('$1', 1, '$2');"
+        new_lists=$((new_lists + 1))
+        echo "adlist + $1"
+      fi
+    }
+
+    # regex <pattern> <comment>
+    regex() {
+      if [ "$(pihole-FTL sqlite3 "$DB" "SELECT COUNT(*) FROM domainlist WHERE type = 3 AND domain = '$1';")" = "0" ]; then
+        pihole-FTL sqlite3 "$DB" "INSERT INTO domainlist (type, domain, enabled, comment) VALUES (3, '$1', 1, '$2');"
+        echo "regex  + $1"
+      fi
+    }
+
+    adlist https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/ultimate.txt "Ultimate Hagezi block list"
+    adlist https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/tif.txt      "Threat intelligence"
+    adlist https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/social.txt   "Social networks"
+    adlist https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/nsfw.txt     "NSFW"
+    adlist https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/gambling.txt "Gambling"
+    adlist https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/fake.txt     "Scams Traps"
+
+    regex '(\.|^)youtube\.com$'            "Static urls"
+    regex '(\.|^)youtu\.be$'               "Static urls"
+    regex '(\.|^)youtube-nocookie\.com$'   "Static urls"
+    regex '(\.|^)ytimg\.com$'              "Static urls"
+    regex '(\.|^)googlevideo\.com$'        "Static urls"
+    regex '(\.|^)youtubei\.googleapis\.com$' "Static urls"
+
+    # Regex entries apply immediately - only new adlists need a gravity run
+    if [ "$new_lists" -gt 0 ]; then
+      echo "added $new_lists adlist(s), rebuilding gravity"
+      pihole -g
+    else
+      echo "no new adlists, skipping gravity rebuild"
+    fi
