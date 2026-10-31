@@ -18,10 +18,21 @@ NS          := pihole
 provision: 
 	cd $(ANSIBLE_DIR) && ansible-playbook k3s.yml --ask-vault-pass -K
 
-############ Helm
+############ Lint
+# Same checks the lint workflow runs in CI.
 .PHONY: lint
-lint: 
+lint: lint-ansible lint-helm
+
+.PHONY: lint-ansible
+lint-ansible: 
+	cd $(ANSIBLE_DIR) && ansible-lint
+
+.PHONY: lint-helm
+lint-helm: 
 	helm lint $(CHART)
+	helm template $(RELEASE) $(CHART) >/dev/null
+
+############ Helm
 
 .PHONY: template
 template: 

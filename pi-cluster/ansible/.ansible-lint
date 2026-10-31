@@ -1,0 +1,11 @@
+---
+exclude_paths:
+  - group_vars/k3s/vault.yaml
+
+skip_list:
+  # "curl | sh" is the installation method k3s.io documents; there is no
+  # get_url/uri equivalent that runs the installer.
+  - command-instead-of-module
+  # The reboot has to happen before the k3s plays run, and a handler would
+  # be a behaviour change - revisit if the playbook grows.
+  - no-handler
